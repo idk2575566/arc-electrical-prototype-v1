@@ -164,6 +164,34 @@ label { display: grid; gap: 6px; font-size: 0.86rem; color: var(--muted); }
 .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(140px, 1fr)); gap: 8px; }
 .summary-actions { display: flex; gap: 8px; margin-top: 12px; }
 
+.status-stack { display: inline-flex; align-items: center; gap: 8px; }
+
+.connection-status {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: rgba(154, 167, 191, 0.1);
+}
+.connection-status[data-state='connected'] {
+  color: var(--ok);
+  border-color: rgba(74, 222, 128, 0.35);
+  background: rgba(74, 222, 128, 0.14);
+}
+.connection-status[data-state='offline'],
+.connection-status[data-state='save-failed'] {
+  color: var(--danger);
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.14);
+}
+.connection-status[data-state='syncing'] {
+  color: var(--warning);
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.14);
+}
+
 .offline-badge {
   display: none;
   background: rgba(248, 113, 113, 0.16);

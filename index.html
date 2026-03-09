@@ -86,7 +86,10 @@
         <section id="log" class="panel">
           <div class="panel-head">
             <h3>Log Compliance Visit</h3>
-            <span id="offlineBadge" class="offline-badge">Offline</span>
+            <div class="status-stack">
+              <span id="connectionStatus" class="connection-status" data-state="syncing">Syncing…</span>
+              <span id="offlineBadge" class="offline-badge">Offline</span>
+            </div>
           </div>
 
           <div id="draftNotice" class="draft-notice hidden">
@@ -161,6 +164,7 @@
 
     <button id="mobileQuickLog" class="btn btn-primary mobile-cta">+ Quick Log Visit</button>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
   </body>
 </html>

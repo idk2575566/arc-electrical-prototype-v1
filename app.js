@@ -1,4 +1,7 @@
 const CURRENT_USER = 'K. Jones';
+const SUPABASE_URL = 'https://nejgobfkcxumpujzhsjm.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_V1K5b5RRF2iuWvZcwA77sA_M4kASI-p';
+
 const STORAGE_KEYS = {
   preset: 'arc:viewPreset',
   draft: 'arc:visitDraft',
@@ -13,10 +16,12 @@ const sites = [
   { id: 'S-105', name: 'Alder Manufacturing', client: 'Alder Industries', engineer: 'S. Khan', nextDue: '2026-03-01', status: 'overdue', severity: 'high', critical: false }
 ];
 
-const visitHistory = [
-  { siteId: 'S-104', siteName: 'Canal View Apartments', engineer: 'A. Reed', visitDate: '2026-03-08', rcdResult: 'Pass', insulation: '2.8', notes: 'No defects. Consumer board labels updated.' },
-  { siteId: 'S-101', siteName: 'Riverside Retail Park', engineer: 'L. Patel', visitDate: '2026-03-06', rcdResult: 'Pass', insulation: '3.2', notes: 'Lighting circuit tested. All within thresholds.' }
+const seededVisitHistory = [
+  { siteId: 'S-104', siteName: 'Canal View Apartments', clientName: 'Urban Nest', engineer: 'A. Reed', visitDate: '2026-03-08', rcdResult: 'Pass', insulation: '2.8', ptw: 'Yes', remedial: 'No', nextDue: '2026-09-08', notes: 'No defects. Consumer board labels updated.', status: 'completed', createdBy: 'A. Reed' },
+  { siteId: 'S-101', siteName: 'Riverside Retail Park', clientName: 'Halcyon Estates', engineer: 'L. Patel', visitDate: '2026-03-06', rcdResult: 'Pass', insulation: '3.2', ptw: 'Yes', remedial: 'No', nextDue: '2026-09-06', notes: 'Lighting circuit tested. All within thresholds.', status: 'completed', createdBy: 'L. Patel' }
 ];
+
+const visitHistory = [...seededVisitHistory];
 
 const siteTableBody = document.getElementById('siteTableBody');
 const siteCards = document.getElementById('siteCards');
@@ -34,8 +39,10 @@ const presetRow = document.getElementById('presetRow');
 const draftNotice = document.getElementById('draftNotice');
 const restoreDraftBtn = document.getElementById('restoreDraftBtn');
 const discardDraftBtn = document.getElementById('discardDraftBtn');
+const connectionStatus = document.getElementById('connectionStatus');
 
 let activePreset = localStorage.getItem(STORAGE_KEYS.preset) || 'all';
+let supabaseClient = null;
 
 function toStartOfDay(dateStr) {
   const d = new Date(dateStr);
@@ -45,6 +52,114 @@ function toStartOfDay(dateStr) {
 
 function dateYMD(date = new Date()) {
   return date.toISOString().slice(0, 10);
+}
+
+function setConnectionStatus(state, label) {
+  if (!connectionStatus) return;
+  connectionStatus.textContent = label;
+  connectionStatus.dataset.state = state;
+}
+
+function tryInitSupabase() {
+  try {
+    if (!window.supabase || !window.supabase.createClient) {
+      setConnectionStatus('offline', 'Offline');
+      return null;
+    }
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    setConnectionStatus('connected', navigator.onLine ? 'Connected' : 'Offline');
+    return client;
+  } catch (err) {
+    console.error('Supabase initialization failed:', err);
+    setConnectionStatus('offline', 'Offline');
+    return null;
+  }
+}
+
+function inferStatus({ remedial, rcdResult }) {
+  return remedial === 'Yes' || rcdResult === 'Fail' ? 'overdue' : 'completed';
+}
+
+function mapRowToEntry(row) {
+  const site = sites.find((s) => s.name === row.site_name);
+  return {
+    siteId: site?.id || row.site_name,
+    siteName: row.site_name,
+    clientName: row.client_name,
+    engineer: row.engineer_name,
+    visitDate: row.visit_date,
+    rcdResult: row.rcd_result,
+    insulation: row.insulation_result,
+    ptw: row.permit_to_work,
+    remedial: row.remedial_required,
+    nextDue: row.next_due_date,
+    notes: row.notes,
+    status: row.status || inferStatus({ remedial: row.remedial_required, rcdResult: row.rcd_result }),
+    createdBy: row.created_by || CURRENT_USER
+  };
+}
+
+function mapFormToSupabasePayload(formData, site) {
+  const remedial = formData.get('remedial');
+  const rcdResult = formData.get('rcdResult');
+
+  return {
+    site_name: site.name,
+    client_name: site.client,
+    engineer_name: formData.get('engineer'),
+    visit_date: formData.get('visitDate'),
+    permit_to_work: formData.get('ptw'),
+    rcd_result: rcdResult,
+    insulation_result: formData.get('insulation'),
+    remedial_required: remedial,
+    next_due_date: formData.get('nextDue'),
+    notes: formData.get('notes') || '',
+    status: inferStatus({ remedial, rcdResult }),
+    created_by: CURRENT_USER
+  };
+}
+
+async function hydrateFromSupabase() {
+  if (!supabaseClient || !navigator.onLine) {
+    renderHistory();
+    return;
+  }
+
+  setConnectionStatus('syncing', 'Syncing…');
+  const { data, error } = await supabaseClient
+    .from('visit_logs')
+    .select('site_name, client_name, engineer_name, visit_date, permit_to_work, rcd_result, insulation_result, remedial_required, next_due_date, notes, status, created_by')
+    .order('visit_date', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error('Failed to load visit logs:', error);
+    setConnectionStatus('offline', 'Offline');
+    renderHistory();
+    return;
+  }
+
+  const mapped = data.map(mapRowToEntry).reverse();
+  visitHistory.splice(0, visitHistory.length, ...(mapped.length ? mapped : seededVisitHistory));
+
+  const latestBySite = new Map();
+  [...mapped].reverse().forEach((entry) => {
+    if (!latestBySite.has(entry.siteName)) latestBySite.set(entry.siteName, entry);
+  });
+
+  sites.forEach((site) => {
+    const latest = latestBySite.get(site.name);
+    if (!latest) return;
+    site.engineer = latest.engineer || site.engineer;
+    site.nextDue = latest.nextDue || site.nextDue;
+    site.status = latest.status || site.status;
+  });
+
+  setConnectionStatus('connected', 'Connected');
+  renderKpis();
+  renderManagerPanel();
+  renderSites();
+  renderHistory();
 }
 
 // Traffic-light urgency calculation: combines overdue days + severity + critical indicators.
@@ -249,7 +364,13 @@ function restoreDraftToForm() {
 }
 
 function updateOfflineState() {
-  document.body.classList.toggle('offline', !navigator.onLine);
+  const offline = !navigator.onLine;
+  document.body.classList.toggle('offline', offline);
+  if (offline) {
+    setConnectionStatus('offline', 'Offline');
+  } else if (supabaseClient) {
+    setConnectionStatus('connected', 'Connected');
+  }
 }
 
 // Evidence-ready summary card with print + downloadable HTML file.
@@ -290,38 +411,42 @@ function showVisitSummary(entry) {
   });
 }
 
-visitForm.addEventListener('submit', (e) => {
+visitForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-
-  if (!navigator.onLine) {
-    saveDraft();
-    alert('You are offline. Draft saved locally and can be synced when back online.');
-    return;
-  }
 
   const formData = new FormData(visitForm);
   const siteId = formData.get('siteId');
   const site = sites.find((s) => s.id === siteId);
   if (!site) return;
 
-  const newEntry = {
-    siteId,
-    siteName: site.name,
-    engineer: formData.get('engineer'),
-    visitDate: formData.get('visitDate'),
-    rcdResult: formData.get('rcdResult'),
-    insulation: formData.get('insulation'),
-    ptw: formData.get('ptw'),
-    remedial: formData.get('remedial'),
-    nextDue: formData.get('nextDue'),
-    notes: formData.get('notes')
-  };
+  const payload = mapFormToSupabasePayload(formData, site);
+
+  if (!navigator.onLine || !supabaseClient) {
+    saveDraft();
+    setConnectionStatus('offline', 'Offline');
+    alert('You are offline. Draft saved locally and can be synced when back online.');
+    return;
+  }
+
+  setConnectionStatus('syncing', 'Syncing…');
+  const { data, error } = await supabaseClient.from('visit_logs').insert(payload).select().single();
+
+  if (error) {
+    console.error('Failed to save visit log:', error);
+    setConnectionStatus('save-failed', 'Save failed');
+    saveDraft();
+    alert('Could not save to Supabase. Your draft was kept locally.');
+    return;
+  }
+
+  const newEntry = mapRowToEntry(data || payload);
+  newEntry.siteId = site.id;
+  newEntry.siteName = site.name;
 
   visitHistory.push(newEntry);
-
   site.engineer = newEntry.engineer;
   site.nextDue = newEntry.nextDue;
-  site.status = newEntry.remedial === 'Yes' || newEntry.rcdResult === 'Fail' ? 'overdue' : 'completed';
+  site.status = newEntry.status;
 
   renderKpis();
   renderManagerPanel();
@@ -331,6 +456,7 @@ visitForm.addEventListener('submit', (e) => {
 
   visitForm.reset();
   localStorage.removeItem(STORAGE_KEYS.draft);
+  setConnectionStatus('connected', 'Connected');
 });
 
 searchInput.addEventListener('input', renderSites);
@@ -378,14 +504,17 @@ presetRow.addEventListener('click', (e) => {
 
 visitForm.addEventListener('input', saveDraft);
 window.addEventListener('offline', updateOfflineState);
-window.addEventListener('online', updateOfflineState);
+window.addEventListener('online', async () => {
+  updateOfflineState();
+  await hydrateFromSupabase();
+});
 restoreDraftBtn.addEventListener('click', restoreDraftToForm);
 discardDraftBtn.addEventListener('click', () => {
   localStorage.removeItem(STORAGE_KEYS.draft);
   draftNotice.classList.add('hidden');
 });
 
-(function init() {
+(async function init() {
   renderKpis();
   renderManagerPanel();
   renderSites();
@@ -403,4 +532,7 @@ discardDraftBtn.addEventListener('click', () => {
     visitSummary.classList.remove('hidden');
     visitSummary.innerHTML = savedSummary;
   }
+
+  supabaseClient = tryInitSupabase();
+  await hydrateFromSupabase();
 })();
