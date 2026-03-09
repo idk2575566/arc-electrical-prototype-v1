@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arc Electrical | Compliance Prototype</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">⚡</div>
+          <div>
+            <h1>Arc Electrical</h1>
+            <p>Site Compliance</p>
+          </div>
+        </div>
+        <nav class="nav-links">
+          <a href="#dashboard" class="active">Dashboard</a>
+          <a href="#sites">Sites</a>
+          <a href="#log">Log Visit</a>
+          <a href="#history">History</a>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div>
+            <h2>Field Operations Dashboard</h2>
+            <p>Track due checks, visit logs, and recent electrical submissions.</p>
+          </div>
+          <button id="newVisitBtn" class="btn btn-primary">+ New Visit</button>
+        </header>
+
+        <section id="dashboard" class="kpi-grid"></section>
+
+        <section id="sites" class="panel">
+          <div class="panel-head">
+            <h3>Site Register</h3>
+            <div class="toolbar">
+              <input id="searchInput" type="text" placeholder="Search site / client / engineer" />
+              <select id="statusFilter">
+                <option value="all">All statuses</option>
+                <option value="due">Due</option>
+                <option value="overdue">Overdue</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Site</th>
+                  <th>Client</th>
+                  <th>Engineer</th>
+                  <th>Next Test Due</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="siteTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="log" class="panel">
+          <div class="panel-head">
+            <h3>Log Compliance Visit</h3>
+          </div>
+          <form id="visitForm" class="visit-form">
+            <div class="form-grid">
+              <label>Site
+                <select name="siteId" id="siteSelect" required></select>
+              </label>
+              <label>Visit date
+                <input type="date" name="visitDate" required />
+              </label>
+              <label>Engineer
+                <input type="text" name="engineer" placeholder="e.g. K. Jones" required />
+              </label>
+              <label>Permit-to-work checked
+                <select name="ptw" required>
+                  <option value="">Select...</option>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                </select>
+              </label>
+              <label>RCD test result
+                <select name="rcdResult" required>
+                  <option value="">Select...</option>
+                  <option value="Pass">Pass</option>
+                  <option value="Fail">Fail</option>
+                </select>
+              </label>
+              <label>Insulation resistance (MΩ)
+                <input type="number" name="insulation" step="0.1" min="0" placeholder="e.g. 2.5" required />
+              </label>
+              <label>Remedial action required
+                <select name="remedial" required>
+                  <option value="">Select...</option>
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </label>
+              <label>Next due date
+                <input type="date" name="nextDue" required />
+              </label>
+            </div>
+            <label>Notes
+              <textarea name="notes" rows="3" placeholder="Any findings, defects, or follow-up actions"></textarea>
+            </label>
+            <button type="submit" class="btn btn-primary">Save Visit Record</button>
+          </form>
+        </section>
+
+        <section id="history" class="panel">
+          <div class="panel-head">
+            <h3>Recent Submissions</h3>
+          </div>
+          <div id="historyList" class="history-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
