@@ -147,8 +147,13 @@
             <label>Notes
               <textarea name="notes" rows="3" placeholder="Any findings, defects, or follow-up actions"></textarea>
             </label>
-            <button type="submit" class="btn btn-primary">Save Visit Record</button>
+            <div id="formFeedback" class="form-feedback hidden" role="alert" aria-live="assertive"></div>
+            <div class="submit-row">
+              <button type="submit" class="btn btn-primary">Save Visit Record</button>
+              <div id="lastActionMessage" class="last-action" aria-live="polite">Last action: none yet.</div>
+            </div>
           </form>
+          <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
         </section>
 
         <section id="visitSummary" class="panel hidden"></section>

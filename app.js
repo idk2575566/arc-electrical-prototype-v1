@@ -40,6 +40,9 @@ const draftNotice = document.getElementById('draftNotice');
 const restoreDraftBtn = document.getElementById('restoreDraftBtn');
 const discardDraftBtn = document.getElementById('discardDraftBtn');
 const connectionStatus = document.getElementById('connectionStatus');
+const formFeedback = document.getElementById('formFeedback');
+const lastActionMessage = document.getElementById('lastActionMessage');
+const toastRegion = document.getElementById('toastRegion');
 
 let activePreset = localStorage.getItem(STORAGE_KEYS.preset) || 'all';
 let supabaseClient = null;
@@ -60,6 +63,71 @@ function setConnectionStatus(state, label) {
   connectionStatus.dataset.state = state;
 }
 
+function setLastAction(type, message) {
+  if (!lastActionMessage) return;
+  lastActionMessage.classList.remove('success', 'error', 'info');
+  if (type) lastActionMessage.classList.add(type);
+  lastActionMessage.textContent = `Last action: ${message}`;
+}
+
+function showToast(type, message) {
+  if (!toastRegion) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type || 'info'}`;
+  toast.textContent = message;
+  toastRegion.appendChild(toast);
+  window.setTimeout(() => toast.remove(), 4200);
+}
+
+function clearValidationErrors() {
+  if (formFeedback) {
+    formFeedback.classList.add('hidden');
+    formFeedback.innerHTML = '';
+  }
+
+  visitForm.querySelectorAll('.field-error').forEach((node) => node.remove());
+  visitForm.querySelectorAll('.field-invalid').forEach((node) => node.classList.remove('field-invalid'));
+}
+
+function setFieldError(fieldName, message) {
+  const field = visitForm.elements[fieldName];
+  if (!field) return;
+  field.classList.add('field-invalid');
+  const err = document.createElement('div');
+  err.className = 'field-error';
+  err.textContent = message;
+  field.insertAdjacentElement('afterend', err);
+}
+
+function validateVisitForm(formData) {
+  const required = [
+    ['siteId', 'Select a site.'],
+    ['visitDate', 'Visit date is required.'],
+    ['engineer', 'Engineer name is required.'],
+    ['rcdResult', 'RCD result is required.'],
+    ['ptw', 'Permit-to-work check is required.'],
+    ['insulation', 'Insulation result is required.'],
+    ['remedial', 'Remedial selection is required.'],
+    ['nextDue', 'Next due date is required.']
+  ];
+
+  const errors = [];
+  required.forEach(([name, message]) => {
+    const value = String(formData.get(name) || '').trim();
+    if (!value) {
+      errors.push({ name, message });
+      setFieldError(name, message);
+    }
+  });
+
+  if (errors.length && formFeedback) {
+    formFeedback.classList.remove('hidden');
+    formFeedback.innerHTML = `<strong>Fix the highlighted fields before saving.</strong><br>${errors.map((e) => `• ${e.message}`).join('<br>')}`;
+  }
+
+  return errors;
+}
+
 function tryInitSupabase() {
   try {
     if (!window.supabase || !window.supabase.createClient) {
@@ -76,8 +144,15 @@ function tryInitSupabase() {
   }
 }
 
+function normalizeYesNo(value) {
+  if (typeof value === 'boolean') return value;
+  if (value === 'Yes') return true;
+  if (value === 'No') return false;
+  return null;
+}
+
 function inferStatus({ remedial, rcdResult }) {
-  return remedial === 'Yes' || rcdResult === 'Fail' ? 'overdue' : 'completed';
+  return normalizeYesNo(remedial) === true || rcdResult === 'Fail' ? 'overdue' : 'completed';
 }
 
 function mapRowToEntry(row) {
@@ -90,8 +165,8 @@ function mapRowToEntry(row) {
     visitDate: row.visit_date,
     rcdResult: row.rcd_result,
     insulation: row.insulation_result,
-    ptw: row.permit_to_work,
-    remedial: row.remedial_required,
+    ptw: normalizeYesNo(row.permit_to_work) === true ? 'Yes' : 'No',
+    remedial: normalizeYesNo(row.remedial_required) === true ? 'Yes' : 'No',
     nextDue: row.next_due_date,
     notes: row.notes,
     status: row.status || inferStatus({ remedial: row.remedial_required, rcdResult: row.rcd_result }),
@@ -100,7 +175,8 @@ function mapRowToEntry(row) {
 }
 
 function mapFormToSupabasePayload(formData, site) {
-  const remedial = formData.get('remedial');
+  const remedial = normalizeYesNo(formData.get('remedial'));
+  const permitToWork = normalizeYesNo(formData.get('ptw'));
   const rcdResult = formData.get('rcdResult');
 
   return {
@@ -108,7 +184,7 @@ function mapFormToSupabasePayload(formData, site) {
     client_name: site.client,
     engineer_name: formData.get('engineer'),
     visit_date: formData.get('visitDate'),
-    permit_to_work: formData.get('ptw'),
+    permit_to_work: permitToWork,
     rcd_result: rcdResult,
     insulation_result: formData.get('insulation'),
     remedial_required: remedial,
@@ -413,18 +489,36 @@ function showVisitSummary(entry) {
 
 visitForm.addEventListener('submit', async (e) => {
   e.preventDefault();
+  clearValidationErrors();
 
   const formData = new FormData(visitForm);
+  const validationErrors = validateVisitForm(formData);
+  if (validationErrors.length) {
+    setLastAction('error', 'Validation failed. Complete all required fields.');
+    showToast('error', 'Could not save. Please fix required fields.');
+    return;
+  }
+
   const siteId = formData.get('siteId');
   const site = sites.find((s) => s.id === siteId);
-  if (!site) return;
+  if (!site) {
+    setFieldError('siteId', 'Select a valid site.');
+    if (formFeedback) {
+      formFeedback.classList.remove('hidden');
+      formFeedback.textContent = 'Selected site is invalid. Choose a site from the list.';
+    }
+    setLastAction('error', 'Validation failed. Invalid site selected.');
+    showToast('error', 'Selected site is invalid.');
+    return;
+  }
 
   const payload = mapFormToSupabasePayload(formData, site);
 
   if (!navigator.onLine || !supabaseClient) {
     saveDraft();
     setConnectionStatus('offline', 'Offline');
-    alert('You are offline. Draft saved locally and can be synced when back online.');
+    setLastAction('info', 'Offline. Draft saved locally.');
+    showToast('info', 'Offline: draft saved locally and can be restored later.');
     return;
   }
 
@@ -435,7 +529,18 @@ visitForm.addEventListener('submit', async (e) => {
     console.error('Failed to save visit log:', error);
     setConnectionStatus('save-failed', 'Save failed');
     saveDraft();
-    alert('Could not save to Supabase. Your draft was kept locally.');
+
+    const providerMessage = error.message || error.details || 'Unknown provider error';
+    const policyBlocked = error.code === '42501' || error.status === 401 || error.status === 403 || /policy|row-level security/i.test(providerMessage);
+    const message = policyBlocked ? `DB policy blocked write: ${providerMessage}` : `Save failed: ${providerMessage}`;
+
+    if (formFeedback) {
+      formFeedback.classList.remove('hidden');
+      formFeedback.textContent = message;
+    }
+
+    setLastAction('error', message);
+    showToast('error', message);
     return;
   }
 
@@ -455,8 +560,11 @@ visitForm.addEventListener('submit', async (e) => {
   showVisitSummary(newEntry);
 
   visitForm.reset();
+  clearValidationErrors();
   localStorage.removeItem(STORAGE_KEYS.draft);
   setConnectionStatus('connected', 'Connected');
+  setLastAction('success', `Saved visit for ${site.name} on ${newEntry.visitDate}.`);
+  showToast('success', 'Visit record saved to Supabase.');
 });
 
 searchInput.addEventListener('input', renderSites);
@@ -508,10 +616,17 @@ window.addEventListener('online', async () => {
   updateOfflineState();
   await hydrateFromSupabase();
 });
-restoreDraftBtn.addEventListener('click', restoreDraftToForm);
+restoreDraftBtn.addEventListener('click', () => {
+  const restored = restoreDraftToForm();
+  if (restored) {
+    setLastAction('info', 'Draft restored from local storage.');
+    showToast('info', 'Draft restored.');
+  }
+});
 discardDraftBtn.addEventListener('click', () => {
   localStorage.removeItem(STORAGE_KEYS.draft);
   draftNotice.classList.add('hidden');
+  setLastAction('info', 'Draft discarded.');
 });
 
 (async function init() {
@@ -522,6 +637,7 @@ discardDraftBtn.addEventListener('click', () => {
   renderHistory();
   renderPresetState();
   updateOfflineState();
+  setLastAction('info', 'Ready to save a new visit.');
 
   if (localStorage.getItem(STORAGE_KEYS.draft)) {
     draftNotice.classList.remove('hidden');

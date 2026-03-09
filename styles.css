@@ -216,6 +216,63 @@ label { display: grid; gap: 6px; font-size: 0.86rem; color: var(--muted); }
   flex-wrap: wrap;
 }
 
+.form-feedback {
+  border-radius: 10px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.14);
+  color: #ffd4d4;
+  padding: 10px;
+  font-size: 0.85rem;
+}
+
+.submit-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.last-action {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.last-action.success { color: var(--ok); }
+.last-action.error { color: var(--danger); }
+.last-action.info { color: var(--warning); }
+
+.field-error {
+  color: var(--danger);
+  font-size: 0.78rem;
+}
+
+.field-invalid {
+  border-color: rgba(248, 113, 113, 0.6);
+}
+
+.toast-region {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: grid;
+  gap: 8px;
+  z-index: 1000;
+}
+
+.toast {
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: #0f1627;
+  min-width: 220px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  font-size: 0.85rem;
+}
+
+.toast.success { border-color: rgba(74, 222, 128, 0.45); color: #c8ffd8; }
+.toast.error { border-color: rgba(248, 113, 113, 0.45); color: #ffd4d4; }
+.toast.info { border-color: rgba(251, 191, 36, 0.45); color: #ffe7a6; }
+
 .btn {
   border: none;
   border-radius: 10px;

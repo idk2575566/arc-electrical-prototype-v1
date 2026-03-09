@@ -48,10 +48,10 @@ Expected table: `visit_logs`
 - `client_name` (text)
 - `engineer_name` (text)
 - `visit_date` (date)
-- `permit_to_work` (text)
+- `permit_to_work` (boolean)
 - `rcd_result` (text)
 - `insulation_result` (numeric/text)
-- `remedial_required` (text)
+- `remedial_required` (boolean)
 - `next_due_date` (date)
 - `notes` (text)
 - `status` (text)
@@ -91,6 +91,29 @@ Then visit: `http://localhost:8080`
 - When online, history and new submissions use Supabase.
 - Local UX behavior remains intact (presets, urgency, manager panel, summary export, draft recovery).
 - If a save fails, user draft is retained locally and status changes to **Save failed**.
+- Submit flow now shows inline validation, toast feedback, and a visible **Last action** message near the button.
+
+## Troubleshooting submit failures
+
+If **Save Visit Record** fails, check the Last action message in the Log Visit panel:
+
+- `Validation failed...`
+  - One or more required fields are missing.
+  - Fix highlighted fields (site, dates, engineer, RCD, PTW, insulation, remedial, next due).
+- `Offline... Draft saved locally.`
+  - Browser is offline or Supabase client unavailable.
+  - Your draft is preserved and can be restored when back online.
+- `DB policy blocked write: ...`
+  - Supabase Row Level Security/policy prevented insert.
+  - Update `visit_logs` insert policy for your anon/publishable role.
+- `Save failed: ...`
+  - Supabase returned another provider error; details are shown directly in UI.
+
+### Quick checks
+
+1. Confirm `permit_to_work` and `remedial_required` are boolean columns.
+2. Confirm anon role has insert policy on `public.visit_logs`.
+3. Confirm the project URL/key in `app.js` match the target Supabase project.
 
 ## Deploy (Vercel static)
 

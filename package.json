@@ -1,0 +1,23 @@
+{
+  "name": "arc-electrical-prototype-v1",
+  "version": "1.0.0",
+  "description": "Static front-end prototype for an electrician compliance workflow dashboard, now wired to Supabase for real visit log read/write.",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/idk2575566/arc-electrical-prototype-v1.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/idk2575566/arc-electrical-prototype-v1/issues"
+  },
+  "homepage": "https://github.com/idk2575566/arc-electrical-prototype-v1#readme",
+  "devDependencies": {
+    "playwright": "^1.58.2"
+  }
+}
