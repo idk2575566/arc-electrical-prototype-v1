@@ -101,16 +101,20 @@
           <form id="visitForm" class="visit-form">
             <div class="form-grid first-step">
               <label>Site
-                <select name="siteId" id="siteSelect" required></select>
+                <span class="field-hint required">Required</span>
+                <select name="siteId" id="siteSelect" aria-required="true"></select>
               </label>
               <label>Visit date
-                <input type="date" name="visitDate" required />
+                <span class="field-hint required">Required</span>
+                <input type="date" name="visitDate" aria-required="true" />
               </label>
               <label>Engineer
-                <input type="text" name="engineer" placeholder="e.g. K. Jones" required />
+                <span class="field-hint required">Required</span>
+                <input type="text" name="engineer" placeholder="e.g. K. Jones" aria-required="true" />
               </label>
               <label>RCD test result
-                <select name="rcdResult" required>
+                <span class="field-hint optional">Optional</span>
+                <select name="rcdResult">
                   <option value="">Select...</option>
                   <option value="Pass">Pass</option>
                   <option value="Fail">Fail</option>
@@ -119,32 +123,37 @@
             </div>
 
             <details class="advanced-fields">
-              <summary>Advanced checks</summary>
+              <summary>Advanced checks <span class="field-hint optional">Optional</span></summary>
               <div class="form-grid">
                 <label>Permit-to-work checked
-                  <select name="ptw" required>
+                  <span class="field-hint optional">Optional</span>
+                  <select name="ptw">
                     <option value="">Select...</option>
                     <option value="Yes">Yes</option>
                     <option value="No">No</option>
                   </select>
                 </label>
                 <label>Insulation resistance (MΩ)
-                  <input type="number" name="insulation" step="0.1" min="0" placeholder="e.g. 2.5" required />
+                  <span class="field-hint optional">Optional</span>
+                  <input type="number" name="insulation" step="0.1" min="0" placeholder="e.g. 2.5" />
                 </label>
                 <label>Remedial action required
-                  <select name="remedial" required>
+                  <span class="field-hint optional">Optional</span>
+                  <select name="remedial">
                     <option value="">Select...</option>
                     <option value="No">No</option>
                     <option value="Yes">Yes</option>
                   </select>
                 </label>
                 <label>Next due date
-                  <input type="date" name="nextDue" required />
+                  <span class="field-hint optional">Optional</span>
+                  <input type="date" name="nextDue" />
                 </label>
               </div>
             </details>
 
             <label>Notes
+              <span class="field-hint optional">Optional</span>
               <textarea name="notes" rows="3" placeholder="Any findings, defects, or follow-up actions"></textarea>
             </label>
             <div id="formFeedback" class="form-feedback hidden" role="alert" aria-live="assertive"></div>

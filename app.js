@@ -47,6 +47,12 @@ const toastRegion = document.getElementById('toastRegion');
 let activePreset = localStorage.getItem(STORAGE_KEYS.preset) || 'all';
 let supabaseClient = null;
 
+const REQUIRED_FIELDS = {
+  siteId: 'Select a site.',
+  visitDate: 'Visit date is required.',
+  engineer: 'Engineer name is required.'
+};
+
 function toStartOfDay(dateStr) {
   const d = new Date(dateStr);
   d.setHours(0, 0, 0, 0);
@@ -79,19 +85,33 @@ function showToast(type, message) {
   window.setTimeout(() => toast.remove(), 4200);
 }
 
+function getFieldWrap(field) {
+  return field?.closest('label') || field?.parentElement;
+}
+
+function removeFieldMessages(field) {
+  const wrap = getFieldWrap(field);
+  if (!wrap) return;
+  wrap.querySelectorAll('.field-error, .field-valid-icon').forEach((node) => node.remove());
+}
+
 function clearValidationErrors() {
   if (formFeedback) {
     formFeedback.classList.add('hidden');
     formFeedback.innerHTML = '';
   }
 
-  visitForm.querySelectorAll('.field-error').forEach((node) => node.remove());
-  visitForm.querySelectorAll('.field-invalid').forEach((node) => node.classList.remove('field-invalid'));
+  visitForm.querySelectorAll('.field-error, .field-valid-icon').forEach((node) => node.remove());
+  visitForm.querySelectorAll('.field-invalid, .field-valid').forEach((node) => {
+    node.classList.remove('field-invalid', 'field-valid');
+  });
 }
 
 function setFieldError(fieldName, message) {
   const field = visitForm.elements[fieldName];
   if (!field) return;
+  removeFieldMessages(field);
+  field.classList.remove('field-valid');
   field.classList.add('field-invalid');
   const err = document.createElement('div');
   err.className = 'field-error';
@@ -99,33 +119,59 @@ function setFieldError(fieldName, message) {
   field.insertAdjacentElement('afterend', err);
 }
 
-function validateVisitForm(formData) {
-  const required = [
-    ['siteId', 'Select a site.'],
-    ['visitDate', 'Visit date is required.'],
-    ['engineer', 'Engineer name is required.'],
-    ['rcdResult', 'RCD result is required.'],
-    ['ptw', 'Permit-to-work check is required.'],
-    ['insulation', 'Insulation result is required.'],
-    ['remedial', 'Remedial selection is required.'],
-    ['nextDue', 'Next due date is required.']
-  ];
+function setFieldValid(fieldName) {
+  const field = visitForm.elements[fieldName];
+  if (!field) return;
+  removeFieldMessages(field);
+  field.classList.remove('field-invalid');
+  field.classList.add('field-valid');
+  const tick = document.createElement('span');
+  tick.className = 'field-valid-icon';
+  tick.textContent = '✓';
+  tick.setAttribute('aria-hidden', 'true');
+  field.insertAdjacentElement('afterend', tick);
+}
 
+function validateSingleRequiredField(fieldName, message) {
+  const field = visitForm.elements[fieldName];
+  if (!field) return true;
+  const value = String(field.value || '').trim();
+  if (!value) {
+    setFieldError(fieldName, message);
+    return false;
+  }
+  setFieldValid(fieldName);
+  return true;
+}
+
+function validateVisitForm() {
   const errors = [];
-  required.forEach(([name, message]) => {
-    const value = String(formData.get(name) || '').trim();
-    if (!value) {
-      errors.push({ name, message });
-      setFieldError(name, message);
-    }
+
+  Object.entries(REQUIRED_FIELDS).forEach(([name, message]) => {
+    const valid = validateSingleRequiredField(name, message);
+    if (!valid) errors.push({ name, message });
   });
 
   if (errors.length && formFeedback) {
     formFeedback.classList.remove('hidden');
-    formFeedback.innerHTML = `<strong>Fix the highlighted fields before saving.</strong><br>${errors.map((e) => `• ${e.message}`).join('<br>')}`;
+    formFeedback.innerHTML = '<strong>Please complete highlighted required fields</strong>';
   }
 
   return errors;
+}
+
+function refreshRequiredValidationUI() {
+  Object.entries(REQUIRED_FIELDS).forEach(([name, message]) => {
+    const value = String(visitForm.elements[name]?.value || '').trim();
+    if (value) setFieldValid(name);
+    else {
+      const field = visitForm.elements[name];
+      if (field) {
+        removeFieldMessages(field);
+        field.classList.remove('field-invalid', 'field-valid');
+      }
+    }
+  });
 }
 
 function tryInitSupabase() {
@@ -177,18 +223,20 @@ function mapRowToEntry(row) {
 function mapFormToSupabasePayload(formData, site) {
   const remedial = normalizeYesNo(formData.get('remedial'));
   const permitToWork = normalizeYesNo(formData.get('ptw'));
-  const rcdResult = formData.get('rcdResult');
+  const rcdResult = formData.get('rcdResult') || null;
+  const insulation = String(formData.get('insulation') || '').trim() || null;
+  const nextDueDate = formData.get('nextDue') || null;
 
   return {
     site_name: site.name,
     client_name: site.client,
-    engineer_name: formData.get('engineer'),
+    engineer_name: String(formData.get('engineer') || '').trim(),
     visit_date: formData.get('visitDate'),
     permit_to_work: permitToWork,
     rcd_result: rcdResult,
-    insulation_result: formData.get('insulation'),
+    insulation_result: insulation,
     remedial_required: remedial,
-    next_due_date: formData.get('nextDue'),
+    next_due_date: nextDueDate,
     notes: formData.get('notes') || '',
     status: inferStatus({ remedial, rcdResult }),
     created_by: CURRENT_USER
@@ -433,6 +481,7 @@ function restoreDraftToForm() {
       if (field) field.value = value;
     });
     draftNotice.classList.add('hidden');
+    refreshRequiredValidationUI();
     return true;
   } catch {
     return false;
@@ -492,10 +541,10 @@ visitForm.addEventListener('submit', async (e) => {
   clearValidationErrors();
 
   const formData = new FormData(visitForm);
-  const validationErrors = validateVisitForm(formData);
+  const validationErrors = validateVisitForm();
   if (validationErrors.length) {
-    setLastAction('error', 'Validation failed. Complete all required fields.');
-    showToast('error', 'Could not save. Please fix required fields.');
+    setLastAction('error', 'Please complete highlighted required fields before saving.');
+    showToast('error', 'Please complete highlighted required fields.');
     return;
   }
 
@@ -517,8 +566,8 @@ visitForm.addEventListener('submit', async (e) => {
   if (!navigator.onLine || !supabaseClient) {
     saveDraft();
     setConnectionStatus('offline', 'Offline');
-    setLastAction('info', 'Offline. Draft saved locally.');
-    showToast('info', 'Offline: draft saved locally and can be restored later.');
+    setLastAction('info', 'You are offline. Your draft is saved locally and ready to restore later.');
+    showToast('info', 'You are offline — draft saved locally.');
     return;
   }
 
@@ -539,8 +588,8 @@ visitForm.addEventListener('submit', async (e) => {
       formFeedback.textContent = message;
     }
 
-    setLastAction('error', message);
-    showToast('error', message);
+    setLastAction('error', `We could not save this visit. ${message}`);
+    showToast('error', 'We could not save your visit. Your draft is kept locally.');
     return;
   }
 
@@ -561,10 +610,11 @@ visitForm.addEventListener('submit', async (e) => {
 
   visitForm.reset();
   clearValidationErrors();
+  refreshRequiredValidationUI();
   localStorage.removeItem(STORAGE_KEYS.draft);
   setConnectionStatus('connected', 'Connected');
-  setLastAction('success', `Saved visit for ${site.name} on ${newEntry.visitDate}.`);
-  showToast('success', 'Visit record saved to Supabase.');
+  setLastAction('success', `Visit saved for ${site.name} on ${newEntry.visitDate}.`);
+  showToast('success', 'Visit saved successfully.');
 });
 
 searchInput.addEventListener('input', renderSites);
@@ -611,6 +661,23 @@ presetRow.addEventListener('click', (e) => {
 });
 
 visitForm.addEventListener('input', saveDraft);
+visitForm.addEventListener('input', (e) => {
+  const name = e.target?.name;
+  if (!name || !REQUIRED_FIELDS[name]) return;
+  validateSingleRequiredField(name, REQUIRED_FIELDS[name]);
+  if (formFeedback && formFeedback.classList.contains('hidden') === false) {
+    const hasErrors = Object.keys(REQUIRED_FIELDS).some((fieldName) => !String(visitForm.elements[fieldName]?.value || '').trim());
+    if (!hasErrors) {
+      formFeedback.classList.add('hidden');
+      formFeedback.innerHTML = '';
+    }
+  }
+});
+visitForm.addEventListener('change', (e) => {
+  const name = e.target?.name;
+  if (!name || !REQUIRED_FIELDS[name]) return;
+  validateSingleRequiredField(name, REQUIRED_FIELDS[name]);
+});
 window.addEventListener('offline', updateOfflineState);
 window.addEventListener('online', async () => {
   updateOfflineState();
@@ -642,6 +709,8 @@ discardDraftBtn.addEventListener('click', () => {
   if (localStorage.getItem(STORAGE_KEYS.draft)) {
     draftNotice.classList.remove('hidden');
   }
+
+  refreshRequiredValidationUI();
 
   const savedSummary = localStorage.getItem(STORAGE_KEYS.summary);
   if (savedSummary) {

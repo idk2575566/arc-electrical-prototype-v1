@@ -125,8 +125,16 @@ th { color: var(--muted); font-weight: 600; }
 
 .visit-form { display: grid; gap: 12px; }
 .form-grid { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 10px; }
-label { display: grid; gap: 6px; font-size: 0.86rem; color: var(--muted); }
+label { display: grid; gap: 6px; font-size: 0.86rem; color: var(--muted); position: relative; }
 .first-step label { background: rgba(255,255,255,0.02); padding: 8px; border-radius: 10px; }
+
+.field-hint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.field-hint.optional { color: var(--muted); }
+.field-hint.required { color: #86efac; }
 
 .advanced-fields {
   border: 1px solid var(--border);
@@ -242,12 +250,34 @@ label { display: grid; gap: 6px; font-size: 0.86rem; color: var(--muted); }
 .last-action.info { color: var(--warning); }
 
 .field-error {
-  color: var(--danger);
+  color: #fecaca;
   font-size: 0.78rem;
 }
 
 .field-invalid {
-  border-color: rgba(248, 113, 113, 0.6);
+  border-color: rgba(248, 113, 113, 0.75);
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.25);
+}
+
+.field-valid {
+  border-color: rgba(74, 222, 128, 0.75);
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.2);
+}
+
+.field-valid-icon {
+  position: absolute;
+  right: 12px;
+  top: 57px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #07210f;
+  background: #4ade80;
+  pointer-events: none;
 }
 
 .toast-region {

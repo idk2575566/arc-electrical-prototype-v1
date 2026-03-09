@@ -26,39 +26,44 @@ const { chromium } = require('playwright');
 
   await page.goto('http://127.0.0.1:4173', { waitUntil: 'domcontentloaded' });
 
+  // 1) Missing required fields should block submit
+  await page.click('button:has-text("Save Visit Record")');
+  await page.waitForSelector('#formFeedback:not(.hidden)');
+
+  const feedbackMissing = await page.locator('#formFeedback').innerText();
+  assert.match(feedbackMissing, /Please complete highlighted required fields/i);
+
+  const invalidCount = await page.locator('.field-invalid').count();
+  assert.ok(invalidCount >= 3, 'Expected required fields to show inline errors');
+
+  // 2) Fill required fields only; advanced remains empty
   await page.selectOption('select[name="siteId"]', 'S-101');
   await page.fill('input[name="visitDate"]', '2026-03-09');
   await page.fill('input[name="engineer"]', 'K. Jones');
-  await page.selectOption('select[name="rcdResult"]', 'Pass');
-  await page.click('summary');
-  await page.selectOption('select[name="ptw"]', 'Yes');
-  await page.fill('input[name="insulation"]', '2.8');
-  await page.selectOption('select[name="remedial"]', 'No');
-  await page.fill('input[name="nextDue"]', '2026-09-09');
-  await page.fill('textarea[name="notes"]', 'Playwright verification run');
+
+  const validTicks = await page.locator('.field-valid-icon').count();
+  assert.ok(validTicks >= 3, 'Expected validation ticks on required fields');
 
   await page.click('button:has-text("Save Visit Record")');
 
   await page.waitForFunction(() => {
     const text = document.querySelector('#lastActionMessage')?.textContent || '';
-    return /Saved visit|Save failed|DB policy blocked write|Offline|Validation failed/i.test(text);
+    return /Visit saved|Save failed|DB policy blocked write|offline|offline/i.test(text);
   }, { timeout: 10000 });
 
   const lastAction = await page.locator('#lastActionMessage').innerText();
-  const feedback = await page.locator('#formFeedback').isVisible() ? await page.locator('#formFeedback').innerText() : '';
-
-  assert.ok(/Saved visit|Save failed|DB policy blocked write|Offline|Validation failed/i.test(lastAction), 'No visible submit outcome message found');
+  assert.match(lastAction, /Visit saved|Save failed|DB policy blocked write|offline/i, 'No visible submit outcome message found');
 
   if (capturedInsertBody && typeof capturedInsertBody === 'object') {
-    assert.equal(typeof capturedInsertBody.permit_to_work, 'boolean', 'permit_to_work must be boolean');
-    assert.equal(typeof capturedInsertBody.remedial_required, 'boolean', 'remedial_required must be boolean');
+    assert.equal(capturedInsertBody.site_name?.length > 0, true, 'site_name should be populated');
+    assert.equal(capturedInsertBody.engineer_name, 'K. Jones', 'engineer_name should be captured');
   }
 
   assert.equal(pageErrors.length, 0, `Unexpected page errors: ${pageErrors.join(' | ')}`);
   assert.equal(uncaughtConsole.length, 0, `Unexpected uncaught console errors: ${uncaughtConsole.join(' | ')}`);
 
   console.log('VERIFY_RESULT');
-  console.log(JSON.stringify({ lastAction, feedback, pageErrors, uncaughtConsole, capturedInsertBody }, null, 2));
+  console.log(JSON.stringify({ feedbackMissing, lastAction, pageErrors, uncaughtConsole, capturedInsertBody }, null, 2));
 
   await browser.close();
 })();
