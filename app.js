@@ -19,6 +19,7 @@ const visitHistory = [
 ];
 
 const siteTableBody = document.getElementById('siteTableBody');
+const siteCards = document.getElementById('siteCards');
 const kpiGrid = document.getElementById('dashboard');
 const managerPanel = document.getElementById('managerPanel');
 const searchInput = document.getElementById('searchInput');
@@ -143,6 +144,12 @@ function renderSites() {
     .slice()
     .sort((a, b) => getUrgency(b).score - getUrgency(a).score || a.nextDue.localeCompare(b.nextDue));
 
+  if (!filtered.length) {
+    siteTableBody.innerHTML = '<tr><td colspan="6">No sites match current filters.</td></tr>';
+    siteCards.innerHTML = '<article class="site-card"><div class="meta">No sites match current filters.</div></article>';
+    return;
+  }
+
   siteTableBody.innerHTML = filtered
     .map((site) => {
       const urgency = getUrgency(site);
@@ -156,6 +163,34 @@ function renderSites() {
         <td><span class="urgency-chip ${urgency.className}">${urgency.label}${detail}</span></td>
         <td>${statusChip(site.status)}</td>
       </tr>
+    `;
+    })
+    .join('');
+
+  siteCards.innerHTML = filtered
+    .map((site) => {
+      const urgency = getUrgency(site);
+      const detail = urgency.overdueDays ? `${urgency.overdueDays}d overdue` : 'On schedule';
+      return `
+      <article class="site-card">
+        <div class="site-card-header">
+          <div>
+            <h4>${site.name}${site.critical ? ' ⚠️' : ''}</h4>
+            <div class="meta">${site.client}</div>
+          </div>
+          ${statusChip(site.status)}
+        </div>
+        <div class="site-card-grid">
+          <div><span class="label">Engineer</span>${site.engineer}</div>
+          <div><span class="label">Due date</span>${site.nextDue}</div>
+          <div><span class="label">Urgency</span><span class="urgency-chip ${urgency.className}">${urgency.label}</span></div>
+          <div><span class="label">Priority detail</span>${detail}</div>
+        </div>
+        <div class="site-card-actions">
+          <button class="btn btn-ghost" data-action="view" data-site-id="${site.id}">View</button>
+          <button class="btn btn-primary" data-action="log" data-site-id="${site.id}">Log Visit</button>
+        </div>
+      </article>
     `;
     })
     .join('');
@@ -300,11 +335,36 @@ visitForm.addEventListener('submit', (e) => {
 
 searchInput.addEventListener('input', renderSites);
 statusFilter.addEventListener('change', renderSites);
-newVisitBtn.addEventListener('click', () => {
+function scrollToLog(siteId) {
+  if (siteId) siteSelect.value = siteId;
   document.getElementById('log').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+newVisitBtn.addEventListener('click', () => {
+  scrollToLog();
 });
 mobileQuickLog.addEventListener('click', () => {
-  document.getElementById('log').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToLog();
+});
+
+siteCards.addEventListener('click', (e) => {
+  const actionBtn = e.target.closest('[data-action][data-site-id]');
+  if (!actionBtn) return;
+
+  const siteId = actionBtn.dataset.siteId;
+  const site = sites.find((s) => s.id === siteId);
+  if (!site) return;
+
+  if (actionBtn.dataset.action === 'view') {
+    searchInput.value = site.name;
+    renderSites();
+    document.getElementById('sites').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+
+  if (actionBtn.dataset.action === 'log') {
+    scrollToLog(siteId);
+  }
 });
 
 presetRow.addEventListener('click', (e) => {
